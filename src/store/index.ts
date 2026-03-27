@@ -1,0 +1,1 @@
+// Global state management setup (e.g., Redux store configuration or Zustand store)
