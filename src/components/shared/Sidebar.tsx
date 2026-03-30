@@ -5,7 +5,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { authService } from "@/services/auth.service";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,6 +27,24 @@ const navItems = [
 
 export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    try {
+      await authService.logout();
+      toast.success("تم تسجيل الخروج");
+      onClose();
+      router.replace("/login");
+    } catch {
+      toast.error("حدث خطأ أثناء تسجيل الخروج");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <>
@@ -132,16 +153,17 @@ export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProp
             الإعدادات
           </Link>
 
-          <Link
-            href="/login"
-            onClick={onClose}
+          <button
+            disabled={isLoggingOut}
+            onClick={handleLogout}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
+            type="button"
           >
             <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50">
               <LogOut size={16} />
             </span>
             تسجيل الخروج
-          </Link>
+          </button>
         </div>
       </aside>
     </>
