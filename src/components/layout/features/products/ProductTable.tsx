@@ -62,7 +62,7 @@ export function ProductTable({
                     <div className="flex items-center gap-3">
                       <Image
                         alt={product.name}
-                        className="rounded-lg object-cover bg-slate-100"
+                        className="rounded-lg object-cover bg-slate-100 h-auto"
                         height={46}
                         src={product.images[0]?.url || "https://placehold.co/64x64/png"}
                         unoptimized
