@@ -3,10 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import toast from "react-hot-toast";
 import { UploadCloud } from "lucide-react";
 import { fetchCategories, createCategory } from "../../../../store/slices/categorySlice";
 import { AppDispatch, RootState } from "../../../../store";
+import type { Category } from "../../../../types/category";
+
+interface CategoryNode extends Category {
+  children?: CategoryNode[];
+}
 
 export default function CreateCategoryPage() {
   const dispatch = useDispatch<AppDispatch>();
@@ -19,18 +25,18 @@ export default function CreateCategoryPage() {
   const [preview, setPreview] = useState<string | null>(null);
 
   // Filter only main categories (parent is null/undefined) for the dropdown
-  const mainCategories = categories.filter((c: any) => !c.parent);
+  const mainCategories = (categories as CategoryNode[]).filter((c) => !c.parent);
 
   useEffect(() => {
     dispatch(fetchCategories(true));
   }, [dispatch]);
 
-  // Reset form when switching tabs
-  useEffect(() => {
+  const handleTabChange = (tab: "main" | "sub") => {
+    setActiveTab(tab);
     setFormData({ name: "", parent: "", order: 1, isActive: true });
     setImageFile(null);
     setPreview(null);
-  }, [activeTab]);
+  };
 
   const handleImageDrop = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -58,23 +64,26 @@ export default function CreateCategoryPage() {
         toast.success("Category created successfully!");
         router.push("/categories"); // Redirect back to list
       })
-      .catch((err: any) => toast.error(err));
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(message);
+      });
   };
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4" dir="ltr">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Category Management</h1>
-        <p className="text-gray-500 text-sm mt-1">Organize your store's architecture by curating main categories and their nested sub-collections.</p>
+        <p className="text-gray-500 text-sm mt-1">Organize your store&apos;s architecture by curating main categories and their nested sub-collections.</p>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-gray-200">
-          <button onClick={() => setActiveTab("main")} className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === "main" ? "border-orange-600 text-orange-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          <button onClick={() => handleTabChange("main")} className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === "main" ? "border-orange-600 text-orange-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             Main Category
           </button>
-          <button onClick={() => setActiveTab("sub")} className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === "sub" ? "border-orange-600 text-orange-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
+          <button onClick={() => handleTabChange("sub")} className={`flex-1 py-4 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === "sub" ? "border-orange-600 text-orange-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
             Subcategory
           </button>
         </div>
@@ -92,7 +101,7 @@ export default function CreateCategoryPage() {
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Parent Category</label>
                 <select value={formData.parent} onChange={(e) => setFormData({ ...formData, parent: e.target.value })} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-orange-500 transition-all">
                   <option value="">Select parent...</option>
-                  {mainCategories.map((cat: any) => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
+                  {mainCategories.map((cat) => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
                 </select>
               </div>
             )}
@@ -117,7 +126,7 @@ export default function CreateCategoryPage() {
             <div className="relative w-full h-64 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 flex flex-col items-center justify-center hover:bg-gray-100 transition-colors overflow-hidden group">
               <input type="file" accept="image/*" onChange={handleImageDrop} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
               {preview ? (
-                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                <Image src={preview} alt="Preview" className="object-cover" fill unoptimized sizes="(max-width: 768px) 100vw, 40vw" />
               ) : (
                 <div className="text-center">
                   <UploadCloud className="w-10 h-10 text-gray-400 mx-auto mb-2 group-hover:text-orange-500 transition-colors" />

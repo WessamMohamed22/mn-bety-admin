@@ -3,14 +3,21 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Link from "next/link";
+import Image from "next/image";
 import { GripVertical, Edit2, Trash2, PlusCircle } from "lucide-react";
 import { fetchCategories, toggleCategoryStatus, deleteCategory } from "@/store/slices/categorySlice";
 import { AppDispatch, RootState } from "@/store";
 import toast from "react-hot-toast";
+import type { Category } from "@/types/category";
+
+interface CategoryNode extends Category {
+  children?: CategoryNode[];
+}
 
 export default function CategoriesListPage() {
   const dispatch = useDispatch<AppDispatch>();
   const { categories, isLoading } = useSelector((state: RootState) => state.category);
+  const categoryTree = categories as CategoryNode[];
   
   const [viewMode, setViewMode] = useState<"tree" | "table">("tree");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
@@ -20,7 +27,7 @@ export default function CategoriesListPage() {
     dispatch(fetchCategories(true));
   }, [dispatch]);
 
-  const filteredCategories = categories.filter(c => {
+  const filteredCategories = categoryTree.filter((c) => {
     if (filter === "active") return c.isActive;
     if (filter === "inactive") return !c.isActive;
     return true;
@@ -38,7 +45,7 @@ export default function CategoriesListPage() {
   };
 
   // Render a single row (recursive if tree mode)
-  const renderRow = (cat: any, depth: number = 0) => {
+  const renderRow = (cat: CategoryNode, depth: number = 0) => {
     const isSub = depth > 0;
     
     return (
@@ -49,7 +56,15 @@ export default function CategoriesListPage() {
             
             {/* Image Thumbnail */}
             <div className="w-10 h-10 rounded-lg bg-gray-200 overflow-hidden border border-gray-100 shrink-0">
-              {cat.image?.url ? <img src={cat.image.url} className="w-full h-full object-cover" /> : null}
+              {cat.image?.url ? (
+                <Image
+                  alt={cat.name}
+                  className="w-full h-full object-cover"
+                  height={40}
+                  src={cat.image.url}
+                  width={40}
+                />
+              ) : null}
             </div>
             
             <span className={`font-bold ${isSub ? "text-sm text-gray-600" : "text-gray-900"}`}>{cat.name}</span>
@@ -80,7 +95,7 @@ export default function CategoriesListPage() {
         </div>
 
         {/* Recursively render children if in Tree View */}
-        {viewMode === "tree" && cat.children?.map((child: any) => renderRow(child, depth + 1))}
+        {viewMode === "tree" && cat.children?.map((child) => renderRow(child, depth + 1))}
       </React.Fragment>
     );
   };
