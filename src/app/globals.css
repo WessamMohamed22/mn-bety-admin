@@ -24,3 +24,33 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes floatBg {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-14px) rotate(6deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.35;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 550ms ease-out;
+}
