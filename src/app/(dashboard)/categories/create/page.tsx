@@ -56,7 +56,7 @@ export default function CreateCategoryPage() {
     submitData.append("order", formData.order.toString());
     submitData.append("isActive", formData.isActive.toString());
     if (activeTab === "sub") submitData.append("parent", formData.parent);
-    if (imageFile) submitData.append("image", imageFile);
+    if (imageFile) submitData.append("categoryImage", imageFile);
 
     dispatch(createCategory(submitData))
       .unwrap()
