@@ -1,27 +1,50 @@
-export default function DashboardLayout({
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import DashboardShell from "@/components/layout/DashboardShell";
+import { ACCESS_TOKEN_COOKIE_KEY, USER_ROLES_COOKIE_KEY } from "@/constants/auth";
+import { ROLES } from "@/constants/roles";
+
+const tokenIsActive = (token: string | undefined) => {
+  if (!token) return false;
+
+  try {
+    const payloadBase64 = token.split(".")[1] || "";
+    const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
+    const payload = JSON.parse(payloadJson) as { exp?: number };
+
+    if (!payload.exp) return true;
+
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    return payload.exp > nowInSeconds;
+  } catch {
+    return false;
+  }
+};
+
+const hasAdminRole = (rolesValue: string | undefined) => {
+  if (!rolesValue) return false;
+
+  const roles = decodeURIComponent(rolesValue)
+    .split("|")
+    .map((role) => role.trim())
+    .filter(Boolean);
+
+  return roles.includes(ROLES.ADMIN) || roles.includes(ROLES.SUPER_ADMIN);
+};
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex h-screen bg-gray-50" dir="rtl">
-      {/* مكان الـ Sidebar */}
-      <aside className="w-64 bg-white border-l border-gray-200 hidden md:block">
-        <div className="p-6 font-bold text-2xl text-purple-600 border-b">
-          Mn Bety Admin
-        </div>
-        <div className="p-4 text-gray-500"> sidebar content </div>
-      </aside>
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_KEY)?.value;
+  const roles = cookieStore.get(USER_ROLES_COOKIE_KEY)?.value;
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6">
-          <h2 className="text-lg font-semibold text-gray-800">لوحة التحكم</h2>
-        </header>
+  const canAccess = tokenIsActive(token) && hasAdminRole(roles);
+  if (!canAccess) {
+    redirect("/login");
+  }
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }
