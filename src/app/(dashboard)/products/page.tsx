@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ProductFilters } from "@/components/layout/features/products/ProductFilters";
 import { ProductStats } from "@/components/layout/features/products/ProductStats";
 import { ProductTable } from "@/components/layout/features/products/ProductTable";
 import { productService } from "@/services/product.service";
-import type { Product, ProductModerationStats } from "@/types/product";
+import type { Product, ProductModerationStats, ProductPaginationMeta } from "@/types/product";
 
-const getCategoryName = (product: Product): string =>
-  typeof product.category === "string" ? product.category : product.category.name;
+const PAGE_SIZE = 10;
 
 const calculateStats = (products: Product[]): ProductModerationStats => {
   const queueTotal = products.length;
@@ -26,68 +26,110 @@ const calculateStats = (products: Product[]): ProductModerationStats => {
   };
 };
 
+const getNormalizedPagination = (meta: ProductPaginationMeta, fallbackPage: number) => {
+  const currentPage = meta.currentPage || meta.pageNumber || meta.page || fallbackPage;
+  const limit = meta.limit || meta.safeLimit || PAGE_SIZE;
+  const totalItems = meta.totalItems || meta.total || 0;
+  const totalPages = meta.totalPages || meta.pages || Math.max(1, Math.ceil(totalItems / limit));
+
+  return {
+    currentPage,
+    limit,
+    totalItems,
+    totalPages,
+    hasNextPage: typeof meta.hasNextPage === "boolean" ? meta.hasNextPage : currentPage < totalPages,
+    hasPrevPage: typeof meta.hasPrevPage === "boolean" ? meta.hasPrevPage : currentPage > 1,
+  };
+};
+
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState<ProductModerationStats>({
+    queueTotal: 0,
+    pendingApproval: 0,
+    activeProducts: 0,
+    averageRating: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "pending">("all");
-
-  const loadProducts = async () => {
-    try {
-      setIsLoading(true);
-      const response = await productService.getAllProducts({
-        page: 1,
-        limit: 50,
-        sort: "-createdAt",
-      });
-      setProducts(response.products || []);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to load products";
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [page, setPage] = useState(1);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pagination, setPagination] = useState(() => getNormalizedPagination({}, 1));
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim());
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearchTerm, categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setIsLoading(true);
+        const query = {
+          page,
+          limit: PAGE_SIZE,
+          search: debouncedSearchTerm || undefined,
+          category: categoryFilter === "all" ? undefined : categoryFilter,
+          isApproved: statusFilter === "all" ? undefined : statusFilter === "approved",
+        };
+
+        const productsResult = await productService.getAllProducts(query);
+
+        setProducts(productsResult.products || []);
+        setPagination(getNormalizedPagination(productsResult.pagination || {}, page));
+        setStats(calculateStats(productsResult.products || []));
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to load products";
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     void loadProducts();
-  }, []);
+  }, [page, debouncedSearchTerm, categoryFilter, statusFilter, reloadKey]);
 
   const categories = useMemo(() => {
-    const names = products.map((item) => getCategoryName(item));
-    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    const map = new Map<string, { label: string; value: string }>();
+
+    products.forEach((item) => {
+      if (typeof item.category === "string") {
+        map.set(item.category, { label: item.category, value: item.category });
+        return;
+      }
+
+      const value = item.category._id || item.category.slug || item.category.name;
+      map.set(value, { label: item.category.name, value });
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [products]);
 
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+  const visibleCountLabel = useMemo(() => {
+    if (pagination.totalItems === 0) return "No products";
 
-    return products.filter((item) => {
-      const matchesSearch =
-        term.length === 0 ||
-        item.name.toLowerCase().includes(term) ||
-        item._id.toLowerCase().includes(term) ||
-        getCategoryName(item).toLowerCase().includes(term);
-
-      const matchesCategory = categoryFilter === "all" || getCategoryName(item) === categoryFilter;
-
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "approved" && item.isApproved) ||
-        (statusFilter === "pending" && !item.isApproved);
-
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [products, searchTerm, categoryFilter, statusFilter]);
-
-  const stats = useMemo(() => calculateStats(filteredProducts), [filteredProducts]);
+    const start = (pagination.currentPage - 1) * pagination.limit + 1;
+    const end = Math.min(start + products.length - 1, pagination.totalItems);
+    return `Showing ${start}-${end} of ${pagination.totalItems}`;
+  }, [pagination.currentPage, pagination.limit, pagination.totalItems, products.length]);
 
   const handleApprove = async (id: string) => {
     try {
       setActionLoadingId(id);
-      const { isApproved } = await productService.approveProduct(id);
-      setProducts((prev) => prev.map((item) => (item._id === id ? { ...item, isApproved } : item)));
+      await productService.approveProduct(id);
+      setReloadKey((value) => value + 1);
       toast.success("Product approved");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Approval failed";
@@ -100,8 +142,8 @@ export default function ProductsPage() {
   const handleToggleActive = async (id: string) => {
     try {
       setActionLoadingId(id);
-      const { isActive } = await productService.toggleProductStatus(id);
-      setProducts((prev) => prev.map((item) => (item._id === id ? { ...item, isActive } : item)));
+      await productService.toggleProductStatus(id);
+      setReloadKey((value) => value + 1);
       toast.success("Product status updated");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Status update failed";
@@ -118,7 +160,14 @@ export default function ProductsPage() {
     try {
       setActionLoadingId(id);
       await productService.deleteProduct(id);
-      setProducts((prev) => prev.filter((item) => item._id !== id));
+
+      const hasSingleItemOnPage = products.length === 1;
+      const nextPage = hasSingleItemOnPage && page > 1 ? page - 1 : page;
+      setPage(nextPage);
+      if (nextPage === page) {
+        setReloadKey((value) => value + 1);
+      }
+
       toast.success("Product deleted");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Delete failed";
@@ -126,6 +175,10 @@ export default function ProductsPage() {
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handleDetails = (id: string) => {
+    router.push(`/products/${id}`);
   };
 
   return (
@@ -152,13 +205,44 @@ export default function ProductsPage() {
       {isLoading ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">Loading products...</div>
       ) : (
-        <ProductTable
-          actionLoadingId={actionLoadingId}
-          onApprove={handleApprove}
-          onDelete={handleDelete}
-          onToggleActive={handleToggleActive}
-          products={filteredProducts}
-        />
+        <>
+          <ProductTable
+            actionLoadingId={actionLoadingId}
+            onApprove={handleApprove}
+            onDelete={handleDelete}
+            onDetails={handleDetails}
+            onToggleActive={handleToggleActive}
+            products={products}
+          />
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-xs text-slate-500">{visibleCountLabel}</p>
+
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={!pagination.hasPrevPage || isLoading}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                type="button"
+              >
+                Previous
+              </button>
+
+              <span className="text-xs font-semibold text-slate-600">
+                Page {pagination.currentPage} / {pagination.totalPages}
+              </span>
+
+              <button
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                disabled={!pagination.hasNextPage || isLoading}
+                onClick={() => setPage((prev) => prev + 1)}
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
