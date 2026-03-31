@@ -23,9 +23,25 @@ export default function LoginPage() {
     const token = getStoredToken();
     const currentUser = getStoredUser();
 
-    if (token && hasAdminRole(currentUser)) {
-      router.replace("/");
+    if (!token || !hasAdminRole(currentUser)) {
+      // No valid session — clear any stale localStorage data
+      clearAuthSession();
+      return;
     }
+
+    // Also verify the token hasn't expired (matches middleware logic)
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1] || "")) as { exp?: number };
+      if (payload.exp && payload.exp <= Math.floor(Date.now() / 1000)) {
+        clearAuthSession();
+        return;
+      }
+    } catch {
+      clearAuthSession();
+      return;
+    }
+
+    router.replace("/");
   }, [router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

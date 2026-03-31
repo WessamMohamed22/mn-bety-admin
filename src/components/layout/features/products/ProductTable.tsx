@@ -13,10 +13,14 @@ interface ProductTableProps {
   onDelete: (id: string) => Promise<void>;
 }
 
-const getCategoryName = (product: Product): string =>
-  typeof product.category === "string" ? product.category : product.category.name;
+const getCategoryName = (product: Product): string => {
+  if (!product.category) return "Unknown Category";
+  if (typeof product.category === "string") return product.category;
+  return product.category.name || "Unknown Category";
+};
 
 const getSellerName = (product: Product): string => {
+  if (!product.seller) return "Unknown Seller";
   if (typeof product.seller === "string") return product.seller;
   return product.seller.userId?.fullName || "Unknown Seller";
 };

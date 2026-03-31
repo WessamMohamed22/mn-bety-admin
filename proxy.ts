@@ -1,40 +1,64 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ACCESS_TOKEN_COOKIE_KEY, USER_ROLES_COOKIE_KEY } from "./src/constants/auth";
+import {
+  ACCESS_TOKEN_COOKIE_KEY,
+  USER_ROLES_COOKIE_KEY,
+} from "./src/constants/auth";
 import { ROLES } from "./src/constants/roles";
 
+// ================= PUBLIC ROUTES =================
 const PUBLIC_ROUTES = ["/login"];
-const PROTECTED_PREFIXES = ["/", "/products", "/orders", "/categories", "/users", "/sellers", "/settings"];
 
+// ================= PROTECTED ROUTES =================
+const PROTECTED_PREFIXES = [
+  "/products",
+  "/orders",
+  "/categories",
+  "/users",
+  "/sellers",
+  "/settings",
+];
+
+// ================= TOKEN CHECK =================
 const isTokenActive = (token: string | undefined) => {
   if (!token) return false;
 
   try {
-    const payload = JSON.parse(atob(token.split(".")[1] || "")) as { exp?: number };
+    const payload = JSON.parse(atob(token.split(".")[1] || "")) as {
+      exp?: number;
+    };
+
     if (!payload.exp) return true;
 
-    const nowInSeconds = Math.floor(Date.now() / 1000);
-    return payload.exp > nowInSeconds;
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp > now;
   } catch {
     return false;
   }
 };
 
+// ================= PROTECTED PATH CHECK =================
 const isProtectedPath = (pathname: string) => {
-  if (pathname === "/") return true;
-  return PROTECTED_PREFIXES.some((prefix) => prefix !== "/" && pathname.startsWith(prefix));
+  return PROTECTED_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
 };
 
+// ================= ROLE CHECK =================
 const hasAdminRole = (rolesValue: string | undefined) => {
   if (!rolesValue) return false;
 
   const roles = decodeURIComponent(rolesValue)
     .split("|")
-    .map((role) => role.trim())
+    .map((r) => r.trim())
     .filter(Boolean);
 
-  return roles.includes(ROLES.ADMIN) || roles.includes(ROLES.SUPER_ADMIN);
+  return (
+    roles.includes(ROLES.ADMIN) ||
+    roles.includes(ROLES.SUPER_ADMIN)
+  );
 };
 
+// ================= MAIN MIDDLEWARE =================
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -44,21 +68,42 @@ export function proxy(request: NextRequest) {
   const isLoggedIn = isTokenActive(token);
   const isAdmin = hasAdminRole(roles);
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const isProtected = isProtectedPath(pathname);
 
-  if (isPublicRoute && isLoggedIn && isAdmin) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // ================= 1. LOGIN PAGE =================
+  if (isPublicRoute) {
+    if (isLoggedIn && isAdmin) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    return NextResponse.next();
   }
 
-  if (isProtectedPath(pathname) && (!isLoggedIn || !isAdmin)) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    response.cookies.delete(ACCESS_TOKEN_COOKIE_KEY);
-    response.cookies.delete(USER_ROLES_COOKIE_KEY);
-    return response;
+  // ================= 2. HOME PAGE "/" =================
+  if (pathname === "/") {
+    if (!isLoggedIn || !isAdmin) {
+      const res = NextResponse.redirect(new URL("/login", request.url));
+      res.cookies.delete(ACCESS_TOKEN_COOKIE_KEY);
+      res.cookies.delete(USER_ROLES_COOKIE_KEY);
+      return res;
+    }
+    return NextResponse.next();
   }
 
+  // ================= 3. PROTECTED ROUTES =================
+  if (isProtected) {
+    if (!isLoggedIn || !isAdmin) {
+      const res = NextResponse.redirect(new URL("/login", request.url));
+      res.cookies.delete(ACCESS_TOKEN_COOKIE_KEY);
+      res.cookies.delete(USER_ROLES_COOKIE_KEY);
+      return res;
+    }
+  }
+
+  // ================= 4. DEFAULT =================
   return NextResponse.next();
 }
 
+// ================= MATCHER =================
 export const config = {
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
