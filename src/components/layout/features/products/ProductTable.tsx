@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CheckCircle2, Power, Trash2 } from "lucide-react";
+import { CheckCircle2, Eye, Power, Trash2 } from "lucide-react";
 import type { Product } from "@/types/product";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 
@@ -11,6 +11,7 @@ interface ProductTableProps {
   onApprove: (id: string) => Promise<void>;
   onToggleActive: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onDetails: (id: string) => void;
 }
 
 const getCategoryName = (product: Product): string => {
@@ -31,6 +32,7 @@ export function ProductTable({
   onApprove,
   onToggleActive,
   onDelete,
+  onDetails,
 }: ProductTableProps) {
   if (products.length === 0) {
     return (
@@ -134,6 +136,16 @@ export function ProductTable({
                         type="button"
                       >
                         <Trash2 size={18} />
+                      </button>
+
+                      <button
+                        className="p-2 rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                        disabled={isLoading}
+                        onClick={() => onDetails(product._id)}
+                        title="Details"
+                        type="button"
+                      >
+                        <Eye size={18} />
                       </button>
                     </div>
                   </td>
