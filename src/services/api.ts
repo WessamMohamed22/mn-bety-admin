@@ -152,4 +152,14 @@ export const updateAdminUserRole = async (userId: string, role: Role): Promise<U
   }
 };
 
+export const softDeleteAdminUser = async (userId: string): Promise<void> => {
+  try {
+    await privateApi.delete(`${API_ENDPOINTS.ADMIN.USERS}/${userId}`, {
+      headers: getAuthHeaders(),
+    });
+  } catch (err: unknown) {
+    throw new Error(getErrorMessage(err, "Failed to delete user"));
+  }
+};
+
 export default privateApi;
