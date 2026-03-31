@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Bell, Home, LogOut, Menu, Search, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { authService } from "@/services/auth.service";
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -11,7 +13,23 @@ interface NavbarProps {
 
 export function Navbar({ onMenuClick }: NavbarProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    try {
+      await authService.logout();
+      toast.success("تم تسجيل الخروج");
+      router.replace("/login");
+    } catch {
+      toast.error("حدث خطأ أثناء تسجيل الخروج");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const quickLinks = useMemo(
     () => [
@@ -106,7 +124,8 @@ export function Navbar({ onMenuClick }: NavbarProps) {
 
           <button
             className="h-10 w-10 rounded-xl bg-red-50 text-red-600 hover:bg-red-100"
-            onClick={() => router.replace("/login")}
+            disabled={isLoggingOut}
+            onClick={handleLogout}
             title="تسجيل الخروج"
             type="button"
           >
