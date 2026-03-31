@@ -4,7 +4,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LogIn, Mail } from "lucide-react";
 import toast from "react-hot-toast";
-import { authService, clearAuthSession, getStoredUser, hasAdminRole } from "@/services/auth.service";
+import {
+  authService,
+  clearAuthSession,
+  getStoredToken,
+  getStoredUser,
+  hasAdminRole,
+} from "@/services/auth.service";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,8 +20,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    const token = getStoredToken();
     const currentUser = getStoredUser();
-    if (hasAdminRole(currentUser)) {
+
+    if (token && hasAdminRole(currentUser)) {
       router.replace("/");
     }
   }, [router]);
@@ -40,8 +48,23 @@ export default function LoginPage() {
       toast.success("تم تسجيل الدخول بنجاح");
       router.replace("/");
     } catch (error: unknown) {
-      const maybeError = error as { response?: { data?: { message?: string } } };
-      toast.error(maybeError.response?.data?.message || "فشل تسجيل الدخول");
+      const maybeError = error as {
+        code?: string;
+        message?: string;
+        response?: { data?: { message?: string } };
+      };
+
+      const backendUnavailable =
+        !maybeError.response &&
+        (maybeError.code === "ECONNREFUSED" ||
+          maybeError.message?.toLowerCase().includes("network") ||
+          maybeError.message?.toLowerCase().includes("econnrefused"));
+
+      toast.error(
+        backendUnavailable
+          ? "الخادم غير متاح حالياً. تأكد أن الباك إند شغال وأن BACKEND_ORIGIN مضبوط صح"
+          : maybeError.response?.data?.message || "فشل تسجيل الدخول"
+      );
     } finally {
       setIsLoading(false);
     }

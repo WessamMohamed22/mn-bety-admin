@@ -1,27 +1,50 @@
-"use client";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import DashboardShell from "@/components/layout/DashboardShell";
+import { ACCESS_TOKEN_COOKIE_KEY, USER_ROLES_COOKIE_KEY } from "@/constants/auth";
+import { ROLES } from "@/constants/roles";
 
-import { useState } from "react";
-import { Navbar } from "@/components/shared/Navbar";
-import { Sidebar } from "@/components/shared/Sidebar";
+const tokenIsActive = (token: string | undefined) => {
+  if (!token) return false;
 
-export default function DashboardLayout({
+  try {
+    const payloadBase64 = token.split(".")[1] || "";
+    const payloadJson = Buffer.from(payloadBase64, "base64").toString("utf-8");
+    const payload = JSON.parse(payloadJson) as { exp?: number };
+
+    if (!payload.exp) return true;
+
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    return payload.exp > nowInSeconds;
+  } catch {
+    return false;
+  }
+};
+
+const hasAdminRole = (rolesValue: string | undefined) => {
+  if (!rolesValue) return false;
+
+  const roles = decodeURIComponent(rolesValue)
+    .split("|")
+    .map((role) => role.trim())
+    .filter(Boolean);
+
+  return roles.includes(ROLES.ADMIN) || roles.includes(ROLES.SUPER_ADMIN);
+};
+
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ACCESS_TOKEN_COOKIE_KEY)?.value;
+  const roles = cookieStore.get(USER_ROLES_COOKIE_KEY)?.value;
 
-  return (
-    <div className="min-h-screen bg-[#f4f6f8]" dir="rtl">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} pendingOrdersCount={7} />
+  const canAccess = tokenIsActive(token) && hasAdminRole(roles);
+  if (!canAccess) {
+    redirect("/login");
+  }
 
-      <div className="min-h-screen md:pr-72 flex flex-col">
-        <Navbar onMenuClick={() => setIsSidebarOpen(true)} />
-
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }

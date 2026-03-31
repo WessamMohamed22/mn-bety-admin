@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
+const backendOrigin = (process.env.BACKEND_ORIGIN || "http://localhost:4000").replace(/\/$/, "");
+
 const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:4000/api/:path*",
+        destination: `${backendOrigin}/api/:path*`,
       },
     ];
   },
