@@ -75,7 +75,7 @@ export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProp
               alt="من بيتي"
               width={150}
               height={40}
-              className="object-contain h-auto"
+              className="object-contain h-auto w-auto"
               priority
             />
             <div>

@@ -5,6 +5,20 @@ import { ROLES } from "./src/constants/roles";
 const PUBLIC_ROUTES = ["/login"];
 const PROTECTED_PREFIXES = ["/", "/products", "/orders", "/categories", "/users", "/sellers", "/settings"];
 
+const isTokenActive = (token: string | undefined) => {
+  if (!token) return false;
+
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] || "")) as { exp?: number };
+    if (!payload.exp) return true;
+
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    return payload.exp > nowInSeconds;
+  } catch {
+    return false;
+  }
+};
+
 const isProtectedPath = (pathname: string) => {
   if (pathname === "/") return true;
   return PROTECTED_PREFIXES.some((prefix) => prefix !== "/" && pathname.startsWith(prefix));
@@ -27,7 +41,7 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get(ACCESS_TOKEN_COOKIE_KEY)?.value;
   const roles = request.cookies.get(USER_ROLES_COOKIE_KEY)?.value;
 
-  const isLoggedIn = Boolean(token);
+  const isLoggedIn = isTokenActive(token);
   const isAdmin = hasAdminRole(roles);
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
