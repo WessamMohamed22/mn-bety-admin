@@ -16,7 +16,9 @@ export interface Category {
 export interface CreateCategoryPayload {
   name: string;
   parent?: string;
-  order: number;
-  isActive: boolean;
+  order?: number;
+  isActive?: boolean;
   image?: File;
 }
+
+export type UpdateCategoryPayload = CreateCategoryPayload;
