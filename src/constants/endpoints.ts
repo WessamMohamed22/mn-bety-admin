@@ -9,4 +9,5 @@ export const API_ENDPOINTS = {
 		USERS: "/admin/users",
 	},
 	PRODUCTS: "/products",
+	SELLERS: "/sellers",
 } as const;
