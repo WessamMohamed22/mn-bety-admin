@@ -290,7 +290,6 @@ export default function CategoriesListPage() {
 
                         <div>
                           <p className="font-semibold text-gray-900">{parent.name}</p>
-                          <p className="text-xs text-gray-500">/{parent.slug}</p>
                         </div>
                       </div>
 
