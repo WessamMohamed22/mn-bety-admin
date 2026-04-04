@@ -1,7 +1,7 @@
 "use client";
 import {
-  X, LayoutDashboard, Package, ShoppingBag,
-  Store, Users, Tags, LogOut, Settings,
+  X, LayoutDashboard, Package,
+  Store, Users, Tags, LogOut,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -19,7 +19,7 @@ interface SidebarProps {
 const navItems = [
   { label: "الرئيسية",   href: "/",           icon: LayoutDashboard },
   { label: "المنتجات",   href: "/products",    icon: Package },
-  { label: "الطلبات",    href: "/orders",      icon: ShoppingBag },
+  // { label: "الطلبات",    href: "/orders",      icon: ShoppingBag },
   { label: "الفئات",     href: "/categories",  icon: Tags },
   { label: "المستخدمين", href: "/users",        icon: Users },
   { label: "المتاجر",    href: "/sellers",      icon: Store },
@@ -94,7 +94,7 @@ export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProp
         </div>
 
         {/* ── Nav ──────────────────────────────────────────────────── */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-orange">
           {navItems.map(({ label, href, icon: Icon }) => {
             const isActive =
               href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -142,7 +142,7 @@ export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProp
 
         {/* ── Footer ───────────────────────────────────────────────── */}
         <div className="px-3 py-4 space-y-1">
-          <Link
+          {/* <Link
             href="/settings"
             onClick={onClose}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors"
@@ -151,7 +151,7 @@ export function Sidebar({ isOpen, onClose, pendingOrdersCount = 0 }: SidebarProp
               <Settings size={16} />
             </span>
             الإعدادات
-          </Link>
+          </Link> */}
 
           <button
             disabled={isLoggingOut}

@@ -25,6 +25,43 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Hide vertical scrollbar while keeping scroll functionality */
+html, body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Orange Slim Scrollbar ─────────────────────────────────────────── */
+.scrollbar-orange::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-orange::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-orange::-webkit-scrollbar-thumb {
+  background: #ec5e0c;
+  border-radius: 3px;
+  transition: background 0.3s ease;
+}
+
+.scrollbar-orange::-webkit-scrollbar-thumb:hover {
+  background: #d94a07;
+}
+
+/* Firefox */
+.scrollbar-orange {
+  scrollbar-color: #ec5e0c transparent;
+  scrollbar-width: thin;
+}
+
 @keyframes floatBg {
   0% {
     transform: translateY(0px) rotate(0deg);
