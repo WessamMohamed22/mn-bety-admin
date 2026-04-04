@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronDown, ChevronUp, Edit2, PlusCircle, Power, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Edit2, ImageIcon, PlusCircle, Power, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { categoryService } from "@/services/category.service";
 import type { Category, CreateCategoryPayload, UpdateCategoryPayload } from "@/types/category";
@@ -32,6 +32,16 @@ const getParentId = (category: Category): string | null => {
   if (typeof category.parent === "string") return category.parent;
   return category.parent._id;
 };
+
+const renderStatus = (isActive: boolean) => (
+  <span
+    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+      isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"
+    }`}
+  >
+    {isActive ? "Active" : "Inactive"}
+  </span>
+);
 
 export default function CategoriesListPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -158,14 +168,7 @@ export default function CategoriesListPage() {
       await loadCategories();
     } catch (error) {
       console.error("Failed to save category", error);
-      const maybeAxiosError = error as {
-        response?: {
-          data?: {
-            message?: string;
-          };
-        };
-      };
-      toast.error(maybeAxiosError.response?.data?.message || "تعذر حفظ بيانات القسم");
+      toast.error("تعذر حفظ بيانات القسم");
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +181,7 @@ export default function CategoriesListPage() {
       return;
     }
 
-    const confirmed = window.confirm(`هل تريد حذف القسم \"${category.name}\"؟`);
+    const confirmed = window.confirm(`هل تريد حذف القسم "${category.name}"؟`);
     if (!confirmed) return;
 
     try {
@@ -186,66 +189,48 @@ export default function CategoriesListPage() {
       toast.success("تم حذف القسم");
       await loadCategories();
     } catch (error) {
-      console.error("Failed to delete category", error);
       toast.error("تعذر حذف القسم");
     }
   };
 
   const handleToggleStatus = async (category: Category) => {
-    const actionLabel = category.isActive ? "تعطيل" : "تفعيل";
-    const confirmed = window.confirm(`هل تريد ${actionLabel} القسم \"${category.name}\"؟`);
-    if (!confirmed) return;
-
     try {
       await categoryService.toggleStatus(category._id);
-      toast.success(`تم ${actionLabel} القسم`);
+      toast.success(`تم تحديث حالة القسم`);
       await loadCategories();
     } catch (error) {
-      console.error("Failed to toggle category status", error);
       toast.error("تعذر تحديث حالة القسم");
     }
   };
 
-  const renderStatus = (isActive: boolean) => {
-    return (
-      <span
-        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-          isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-        }`}
-      >
-        {isActive ? "Active" : "Inactive"}
-      </span>
-    );
-  };
-
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8" dir="ltr">
-      <div className="mb-8 flex items-end justify-between">
+    <div className="mx-auto max-w-6xl px-4 py-6 md:py-8" dir="ltr">
+      {/* Header Section - Responsive Stack */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Categories</h1>
-          <p className="text-gray-500">Manage main categories and sub-categories from backend data.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Categories</h1>
+          <p className="text-sm text-gray-500 font-medium">Manage your store departments and hierarchy.</p>
         </div>
 
         <button
-          className="inline-flex items-center gap-2 rounded-lg bg-orange-700 px-5 py-2.5 font-bold text-white transition-colors hover:bg-orange-800"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-700 px-5 py-3 text-sm font-bold text-white transition-all hover:bg-orange-800 active:scale-95"
           onClick={openCreateModal}
           type="button"
         >
-          <PlusCircle className="h-4 w-4" />
+          <PlusCircle className="h-5 w-5" />
           Add New Category
         </button>
       </div>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex bg-gray-100 p-1 rounded-lg">
+      {/* Filters - Scrollable on mobile */}
+      <div className="mb-6 flex overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+        <div className="flex bg-gray-100 p-1 rounded-xl">
           {(["all", "active", "inactive"] as const).map((t) => (
             <button
-              className={`rounded-md px-4 py-1.5 text-sm font-bold capitalize transition-all ${
-                filter === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`rounded-lg px-6 py-2 text-sm font-bold capitalize transition-all ${filter === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}
               key={t}
               onClick={() => setFilter(t)}
-              type="button"
             >
               {t}
             </button>
@@ -253,284 +238,162 @@ export default function CategoriesListPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-        <div className="grid grid-cols-12 gap-2 border-b border-gray-200 bg-gray-50/70 px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-500">
-          <span className="col-span-5">Category</span>
-          <span className="col-span-2 text-center">Status</span>
-          <span className="col-span-2 text-center">Type</span>
-          <span className="col-span-3 text-right">Actions</span>
+      {/* Table-like Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Table Header - Hidden on mobile, Flex on Desktop */}
+        <div className="hidden md:flex items-center gap-3 border-b border-gray-200 bg-gray-50/70 px-6 py-4 text-xs font-black uppercase tracking-wider text-gray-400">
+          <div className="w-[42%] min-w-70">Category</div>
+          <div className="w-28 text-center">Status</div>
+          <div className="w-32 text-center">Type</div>
+          <div className="w-48 text-right">Actions</div>
         </div>
 
         {isLoading ? (
-          <div className="p-8 text-center text-gray-400 animate-pulse">Loading categories...</div>
+          <div className="p-12 text-center text-gray-400 animate-pulse font-bold">Loading categories...</div>
         ) : (
-          <div>
-            {filteredParentCategories.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">No categories found.</div>
-            ) : (
-              filteredParentCategories.map((parent) => {
-                const subCategories = getSubCategories(parent._id);
-                const isExpanded = Boolean(expandedParents[parent._id]);
+          <div className="divide-y divide-gray-100">
+            {filteredParentCategories.map((parent) => {
+              const subCategories = getSubCategories(parent._id);
+              const isExpanded = Boolean(expandedParents[parent._id]);
 
-                return (
-                  <div className="border-b border-gray-100" key={parent._id}>
-                    <div className="grid grid-cols-12 items-center gap-2 px-4 py-3 hover:bg-gray-50">
-                      <div className="col-span-5 flex items-center gap-3">
-                        <div className="h-11 w-11 overflow-hidden rounded-lg border border-gray-100 bg-gray-100">
-                          {parent.image?.url ? (
-                            <Image
-                              alt={parent.name}
-                              className="h-full w-full object-cover"
-                              height={44}
-                              src={parent.image.url}
-                              width={44}
-                            />
-                          ) : null}
-                        </div>
+              return (
+                <div key={parent._id} className="transition-colors hover:bg-gray-50/50">
+                  {/* Row Structure - Responsive Flex */}
+                  <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:py-4">
 
-                        <div>
-                          <p className="font-semibold text-gray-900">{parent.name}</p>
-                        </div>
+                    {/* Category Info */}
+                    <div className="flex items-center gap-4 md:w-[42%] md:min-w-70">
+                      <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-gray-100 bg-gray-50 relative">
+                        {parent.image?.url ? (
+                          <Image alt={parent.name} fill className="object-cover" src={parent.image.url} />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-gray-300"><ImageIcon size={20} /></div>
+                        )}
                       </div>
-
-                      <div className="col-span-2 text-center">{renderStatus(parent.isActive)}</div>
-                      <div className="col-span-2 text-center text-sm font-medium text-gray-700">Main</div>
-
-                      <div className="col-span-3 flex items-center justify-end gap-2">
-                        <button
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
-                          onClick={() => toggleSubList(parent._id)}
-                          type="button"
-                        >
-                          {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                          Sub-categories ({subCategories.length})
-                        </button>
-
-                        <button
-                          className="rounded-md p-2 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                          onClick={() => openEditModal(parent)}
-                          title="Edit"
-                          type="button"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          className="rounded-md p-2 text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-600"
-                          onClick={() => handleToggleStatus(parent)}
-                          title="Toggle Active"
-                          type="button"
-                        >
-                          <Power className="h-4 w-4" />
-                        </button>
-
-                        <button
-                          className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                          onClick={() => handleDelete(parent)}
-                          title="Delete"
-                          type="button"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div>
+                        <h4 className="font-bold text-gray-900">{parent.name}</h4>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter md:hidden">Main Category</p>
                       </div>
                     </div>
 
-                    {isExpanded && (
-                      <div className="bg-slate-50/70 px-5 py-2">
-                        {subCategories.length === 0 ? (
-                          <p className="py-2 text-sm text-gray-500">No sub-categories under this parent.</p>
-                        ) : (
-                          <div className="space-y-2 py-2">
-                            {subCategories.map((sub) => (
-                              <div
-                                className="grid grid-cols-12 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2"
-                                key={sub._id}
-                              >
-                                <div className="col-span-5 flex items-center gap-3">
-                                  <div className="h-8 w-8 overflow-hidden rounded-md border border-gray-100 bg-gray-100">
-                                    {sub.image?.url ? (
-                                      <Image
-                                        alt={sub.name}
-                                        className="h-full w-full object-cover"
-                                        height={32}
-                                        src={sub.image.url}
-                                        width={32}
-                                      />
-                                    ) : null}
-                                  </div>
-                                  <p className="text-sm font-medium text-gray-800">{sub.name}</p>
-                                </div>
+                    {/* Status & Type - Horizontal on mobile, Fixed width on Desktop */}
+                    <div className="flex items-center justify-between md:justify-center gap-8 md:w-28">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase md:hidden tracking-widest">Status</span>
+                      {renderStatus(parent.isActive)}
+                    </div>
 
-                                <div className="col-span-2 text-center">{renderStatus(sub.isActive)}</div>
-                                <div className="col-span-2 text-center text-sm font-medium text-gray-700">Sub</div>
+                    <div className="hidden md:flex items-center justify-center md:w-32 text-sm font-bold text-gray-500">
+                      Main
+                    </div>
 
-                                <div className="col-span-3 flex items-center justify-end gap-1">
-                                  <button
-                                    className="rounded-md p-2 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                                    onClick={() => openEditModal(sub)}
-                                    type="button"
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </button>
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-50 pt-4 md:w-48 md:flex-nowrap md:justify-end md:border-0 md:pt-0">
+                      <button
+                        className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-[11px] font-black text-slate-600 hover:bg-slate-200"
+                        onClick={() => toggleSubList(parent._id)}
+                      >
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        SUBS ({subCategories.length})
+                      </button>
 
-                                  <button
-                                    className="rounded-md p-2 text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-600"
-                                    onClick={() => handleToggleStatus(sub)}
-                                    type="button"
-                                  >
-                                    <Power className="h-4 w-4" />
-                                  </button>
-
-                                  <button
-                                    className="rounded-md p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                                    onClick={() => handleDelete(sub)}
-                                    type="button"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEditModal(parent)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit2 size={18} />
+                        </button>
+                        <button onClick={() => handleToggleStatus(parent)} className={`p-2 transition-colors rounded-lg ${parent.isActive ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}>
+                          <Power size={18} />
+                        </button>
+                        <button onClick={() => handleDelete(parent)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 size={18} />
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
-                );
-              })
-            )}
+
+                  {/* Expanded Sub-categories Area */}
+                  {isExpanded && (
+                    <div className="space-y-2 border-t border-gray-100/50 bg-gray-50/50 px-4 py-3 md:px-12">
+                      {subCategories.map((sub) => (
+                        <div key={sub._id} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-gray-50 border border-gray-100 relative">
+                              {sub.image?.url && <Image alt={sub.name} fill className="object-cover" src={sub.image.url} />}
+                            </div>
+                            <span className="text-sm font-bold text-gray-700">{sub.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1 self-end sm:self-auto">
+                            <button onClick={() => openEditModal(sub)} className="p-1.5 text-gray-400 hover:text-blue-600"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDelete(sub)} className="p-1.5 text-gray-400 hover:text-red-600"><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
+      {/* Modal - Adjusted for Mobile Viewport */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4" role="dialog">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                {modalMode === "create" ? "Add New Category" : "Edit Category"}
-              </h2>
-
-              <button
-                className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
-                onClick={closeModal}
-                type="button"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 z-100 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+          <div className="w-full max-w-lg rounded-t-[2.5rem] sm:rounded-3xl bg-white shadow-2xl animate-in slide-in-from-bottom duration-300">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-8 py-5">
+              <h2 className="text-xl font-black text-gray-900">{modalMode === "create" ? "New Category" : "Edit Category"}</h2>
+              <button className="rounded-full bg-gray-100 p-2 text-gray-400" onClick={closeModal}><X size={20} /></button>
             </div>
 
-            <form className="space-y-4 px-5 py-5" onSubmit={handleSubmit}>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Category Name</label>
-                <input
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Enter category name"
-                  required
-                  type="text"
-                  value={formState.name}
-                />
-              </div>
+            <form className="p-8 space-y-5" onSubmit={handleSubmit}>
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 no-scrollbar">
+                {/* Inputs Stack */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Category Name</label>
+                  <input className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-orange-50 transition-all outline-none" onChange={(e) => setFormState(prev => ({ ...prev, name: e.target.value }))} placeholder="Electronics..." required value={formState.name} />
+                </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Display Order</label>
-                <input
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-                  min={0}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      order: Number(event.target.value),
-                    }))
-                  }
-                  type="number"
-                  value={formState.order}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Parent Category (Optional)</label>
-                <select
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100"
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      parent: event.target.value,
-                    }))
-                  }
-                  value={formState.parent}
-                >
-                  <option value="">Main Category</option>
-                  {parentCategories
-                    .filter((category) => category._id !== editingCategoryId)
-                    .map((category) => (
-                      <option key={category._id} value={category._id}>
-                        {category.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Category Image</label>
-                <input
-                  accept="image/*"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                  onChange={handleImageChange}
-                  type="file"
-                />
-
-                {formState.imagePreview && (
-                  <div className="mt-2 h-20 w-20 overflow-hidden rounded-lg border border-gray-200">
-                    <Image
-                      alt="Category Preview"
-                      className="h-full w-full object-cover"
-                      height={80}
-                      src={formState.imagePreview}
-                      width={80}
-                    />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Order</label>
+                    <input className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 font-bold" type="number" onChange={(e) => setFormState(prev => ({ ...prev, order: Number(e.target.value) }))} value={formState.order} />
                   </div>
-                )}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Parent</label>
+                    <select className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 font-bold appearance-none" onChange={(e) => setFormState(prev => ({ ...prev, parent: e.target.value }))} value={formState.parent}>
+                      <option value="">None</option>
+                      {parentCategories.filter(c => c._id !== editingCategoryId).map(c => (
+                        <option key={c._id} value={c._id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Upload Photo</label>
+                  <div className="flex items-center gap-4 p-4 rounded-xl border-2 border-dashed border-gray-100 bg-gray-50/50 relative">
+                    {formState.imagePreview ? (
+                      <div className="relative h-14 w-14 overflow-hidden rounded-lg"><Image alt="preview" fill src={formState.imagePreview} className="object-cover" /></div>
+                    ) : (
+                      <div className="h-14 w-14 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400"><ImageIcon size={24} /></div>
+                    )}
+                    <div className="flex-1 text-xs font-bold text-gray-500">Click to choose a file...</div>
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-orange-50/30">
+                  <input type="checkbox" id="activeCheck" checked={formState.isActive} onChange={(e) => setFormState(prev => ({ ...prev, isActive: e.target.checked }))} className="h-5 w-5 rounded accent-orange-600" />
+                  <label htmlFor="activeCheck" className="text-xs font-black text-orange-800 uppercase tracking-tight cursor-pointer">Visible on Storefront</label>
+                </div>
               </div>
 
-              <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-                <input
-                  checked={formState.isActive}
-                  onChange={(event) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      isActive: event.target.checked,
-                    }))
-                  }
-                  type="checkbox"
-                />
-                Active Category
-              </label>
-
-              <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-                <button
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                  onClick={closeModal}
-                  type="button"
-                >
-                  Cancel
-                </button>
-                <button
-                  className="rounded-lg bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={isSubmitting}
-                  type="submit"
-                >
-                  {isSubmitting
-                    ? "Saving..."
-                    : modalMode === "create"
-                      ? "Create Category"
-                      : "Update Category"}
+              {/* Action Buttons Stack */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <button className="flex-1 rounded-xl border border-gray-100 py-4 text-xs font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-colors" onClick={closeModal} type="button">Discard</button>
+                <button className="flex-2 rounded-xl bg-orange-700 py-4 text-xs font-black uppercase tracking-widest text-white shadow-xl shadow-orange-100 hover:bg-orange-800 disabled:opacity-50 transition-all" disabled={isSubmitting} type="submit">
+                  {isSubmitting ? "Saving..." : "Confirm & Save"}
                 </button>
               </div>
             </form>
