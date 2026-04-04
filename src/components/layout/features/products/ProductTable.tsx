@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Power, Trash2 } from "lucide-react";
 import type { Product } from "@/types/product";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { ToggleLeft, ToggleRight } from "lucide-react";
@@ -9,42 +9,16 @@ interface ProductTableProps {
   products: Product[];
   actionLoadingId: string | null;
   onApprove: (id: string) => Promise<void>; // دي اللي هنستخدمها للـ Switch
+  onToggleActive: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onDetails: (id: string) => void;
-}
-
-// ─── Switch Toggle ─────────────────────────────────────────────────────────────
-function ApprovalSwitch({
-  checked,
-  onChange,
-  disabled,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-      disabled={disabled}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed
-        ${checked ? "bg-emerald-500 focus:ring-emerald-500" : "bg-red-400 focus:ring-red-400"}`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200
-          ${checked ? "translate-x-[18px]" : "translate-x-[3px]"}`}
-      />
-    </button>
-  );
 }
 
 export function ProductTable({
   products,
   actionLoadingId,
   onApprove,
+  onToggleActive,
   onDelete,
   onDetails,
 }: ProductTableProps) {
@@ -123,6 +97,18 @@ export function ProductTable({
 
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onToggleActive(product._id)}
+                        disabled={isLoading}
+                        className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-30
+                          ${product.isActive ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"}`}
+                        title={product.isActive ? "Deactivate product" : "Activate product"}
+                        type="button"
+                      >
+                        <Power size={14} />
+                        {product.isActive ? "Active" : "Inactive"}
+                      </button>
+
                       <button onClick={() => onDetails(product._id)} className="text-slate-600 hover:text-slate-900">
                         <Eye size={17} />
                       </button>

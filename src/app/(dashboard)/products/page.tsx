@@ -7,7 +7,7 @@ import { ProductFilters } from "@/components/layout/features/products/ProductFil
 import { ProductStats } from "@/components/layout/features/products/ProductStats";
 import { ProductTable } from "@/components/layout/features/products/ProductTable";
 import { productService } from "@/services/product.service";
-import type { Product, ProductModerationStats, ProductPaginationMeta } from "@/types/product";
+import type { Product, ProductModerationStats, ProductPaginationMeta, ProductQuery } from "@/types/product";
 
 const PAGE_SIZE = 10;
 
@@ -82,7 +82,7 @@ export default function ProductsPage() {
     const loadProducts = async () => {
       try {
         setIsLoading(true);
-        const query: any = {
+        const query: ProductQuery = {
           page,
           limit: PAGE_SIZE,
           search: debouncedSearchTerm || undefined,
@@ -98,8 +98,9 @@ export default function ProductsPage() {
         setProducts(productsResult.products || []);
         setPagination(getNormalizedPagination(productsResult.pagination || {}, page));
         setStats(calculateStats(productsResult.products || []));
-      } catch (error: any) {
-        toast.error(error.message || "Failed to load products");
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Failed to load products";
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
@@ -111,12 +112,19 @@ export default function ProductsPage() {
   const categories = useMemo(() => {
     const map = new Map<string, { label: string; value: string }>();
     products.forEach((item) => {
-      if (typeof item.category === "string") {
-        map.set(item.category, { label: item.category, value: item.category });
+      const category = item.category;
+      if (!category) return;
+
+      if (typeof category === "string") {
+        map.set(category, { label: category, value: category });
         return;
       }
-      const value = item.category._id || item.category.slug || item.category.name;
-      map.set(value, { label: item.category.name, value });
+
+      const label = category.name || category.slug || category._id;
+      const value = category._id || category.slug || category.name;
+      if (!label || !value) return;
+
+      map.set(value, { label, value });
     });
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [products]);
@@ -132,11 +140,12 @@ export default function ProductsPage() {
   const handleApproveToggle = async (id: string) => {
     try {
       setActionLoadingId(id);
-      await productService.approveProduct(id); 
+      await productService.approveProduct(id);
       setReloadKey((value) => value + 1);
       toast.success("Status updated successfully");
-    } catch (error: any) {
-      toast.error(error.message || "Update failed");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Update failed";
+      toast.error(message);
     } finally {
       setActionLoadingId(null);
     }
@@ -148,8 +157,9 @@ export default function ProductsPage() {
       await productService.toggleProductStatus(id);
       setReloadKey((value) => value + 1);
       toast.success("Product active status updated");
-    } catch (error: any) {
-      toast.error("Status update failed");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Status update failed";
+      toast.error(message);
     } finally {
       setActionLoadingId(null);
     }
@@ -170,8 +180,9 @@ export default function ProductsPage() {
       
       if (nextPage === page) setReloadKey((value) => value + 1);
       toast.success("Product deleted");
-    } catch (error: any) {
-      toast.error("Delete failed");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Delete failed";
+      toast.error(message);
     } finally {
       setActionLoadingId(null);
     }

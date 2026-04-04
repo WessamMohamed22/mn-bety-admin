@@ -159,7 +159,7 @@ export default function SellersPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 md:max-w-md"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 md:max-w-md"
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search by store name"
             type="text"
@@ -167,7 +167,7 @@ export default function SellersPage() {
           />
 
           <select
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-300"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-orange-300"
             onChange={(event) => setStatusFilter(event.target.value as "all" | "approved" | "pending")}
             value={statusFilter}
           >
@@ -183,7 +183,7 @@ export default function SellersPage() {
       ) : (
         <>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scrollbar-orange">
               <table className="min-w-full text-left">
                 <thead className="bg-slate-50">
                   <tr>

@@ -11,6 +11,7 @@ import {
   getAdminUsers, softDeleteAdminUser,
   toggleAdminUserStatus, updateAdminUserRole,
 } from "@/services/api";
+import { getStoredUser } from "@/services/auth.service";
 import type { PaginationMeta, User } from "@/types/user";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -23,12 +24,35 @@ type ConfirmModalState =
   | null;
 
 const PAGE_SIZE = 10;
-const MANAGEABLE_ROLES: ManageableRole[] = [ROLES.ADMIN, ROLES.SELLER, ROLES.CUSTOMER];
+const ADMIN_MANAGEABLE_ROLES: ManageableRole[] = [ROLES.SELLER, ROLES.CUSTOMER];
+const SUPER_ADMIN_MANAGEABLE_ROLES: ManageableRole[] = [ROLES.ADMIN, ROLES.SELLER, ROLES.CUSTOMER];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getUserId   = (u: User): string   => u._id || u.id || "";
 const getUserRoles = (roles: string[]): string[] =>
   !roles || roles.length === 0 ? [ROLES.CUSTOMER] : [...new Set(roles)];
+
+const hasAnyRole = (roles: string[], required: string[]) =>
+  required.some((role) => roles.includes(role));
+
+const getRoleAfterAdminRemoval = (roles: string[]): ManageableRole =>
+  roles.includes(ROLES.SELLER) ? ROLES.SELLER : ROLES.CUSTOMER;
+
+const didRoleChangeApply = (previousRoles: string[], updatedRoles: string[], targetRole: ManageableRole) => {
+  const prev = getUserRoles(previousRoles);
+  const next = getUserRoles(updatedRoles);
+  const hadAdmin = prev.includes(ROLES.ADMIN);
+
+  if (targetRole === ROLES.ADMIN) {
+    return next.includes(ROLES.ADMIN);
+  }
+
+  if (hadAdmin) {
+    return !next.includes(ROLES.ADMIN);
+  }
+
+  return next.includes(targetRole);
+};
 
 const isSensitiveRoleChange = (user: User, nextRole: ManageableRole) => {
   const roles = user.roles || [];
@@ -117,7 +141,7 @@ function ConfirmModal({
           <p className="text-sm text-slate-600 leading-relaxed">
             {modal.type === "delete"
               ? `هل تريد حذف حساب "${modal.user.fullName}"؟ سيتم إلغاء تفعيل الحساب نهائياً.`
-              : `هل تريد منح صلاحية "${getRoleLabel(modal.role)}" للمستخدم "${modal.user.fullName}"؟`}
+              : `هل تريد تغيير صلاحية المستخدم "${modal.user.fullName}" إلى "${getRoleLabel(modal.role)}"؟`}
           </p>
         </div>
 
@@ -140,7 +164,7 @@ function ConfirmModal({
             ].join(" ")}
             type="button"
           >
-            {modal.type === "delete" ? "نعم، احذف" : "نعم، أضف الصلاحية"}
+            {modal.type === "delete" ? "نعم، احذف" : "نعم، غيّر الصلاحية"}
           </button>
         </div>
       </div>
@@ -160,9 +184,26 @@ export default function UsersPage() {
   const [verificationFilter,  setVerificationFilter]  = useState<VerificationFilter>("all");
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(null);
   const [pagination, setPagination] = useState(() => normalizePagination({} as PaginationMeta, 1));
+  const [currentUserRoles, setCurrentUserRoles] = useState<string[]>([]);
+
+  const isCurrentUserSuperAdmin = currentUserRoles.includes(ROLES.SUPER_ADMIN);
+  const manageableRoles = isCurrentUserSuperAdmin
+    ? SUPER_ADMIN_MANAGEABLE_ROLES
+    : ADMIN_MANAGEABLE_ROLES;
+
+  useEffect(() => {
+    const storedUser = getStoredUser();
+    setCurrentUserRoles(storedUser?.roles || []);
+  }, []);
 
   // Reset page when filters change
   useEffect(() => { setPage(1); }, [roleFilter, statusFilter, verificationFilter]);
+
+  useEffect(() => {
+    if (!isCurrentUserSuperAdmin && roleFilter === ROLES.ADMIN) {
+      setRoleFilter("all");
+    }
+  }, [isCurrentUserSuperAdmin, roleFilter]);
 
   // Fetch users
   useEffect(() => {
@@ -190,20 +231,24 @@ export default function UsersPage() {
 
   // Local search filter
   const visibleUsers = useMemo(() => {
+    const roleScopedUsers = isCurrentUserSuperAdmin
+      ? users
+      : users.filter((u) => !hasAnyRole(u.roles || [], [ROLES.ADMIN, ROLES.SUPER_ADMIN]));
+
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return users;
-    return users.filter((u) =>
+    if (!term) return roleScopedUsers;
+    return roleScopedUsers.filter((u) =>
       u.fullName?.toLowerCase().includes(term) || u.email?.toLowerCase().includes(term)
     );
-  }, [users, searchTerm]);
+  }, [users, searchTerm, isCurrentUserSuperAdmin]);
 
   // Stats derived from current page
   const stats = useMemo(() => ({
-    total:    pagination.totalItems,
-    active:   users.filter((u) => u.isActive).length,
-    verified: users.filter((u) => u.emailVerified).length,
-    inactive: users.filter((u) => !u.isActive).length,
-  }), [users, pagination.totalItems]);
+    total:    isCurrentUserSuperAdmin ? pagination.totalItems : visibleUsers.length,
+    active:   visibleUsers.filter((u) => u.isActive).length,
+    verified: visibleUsers.filter((u) => u.emailVerified).length,
+    inactive: visibleUsers.filter((u) => !u.isActive).length,
+  }), [visibleUsers, pagination.totalItems, isCurrentUserSuperAdmin]);
 
   // ── Action handlers ─────────────────────────────────────────────────────────
   const handleToggleStatus = async (user: User) => {
@@ -222,10 +267,35 @@ export default function UsersPage() {
 
   const performUpdateRole = async (user: User, role: ManageableRole) => {
     const id = getUserId(user);
-    if ((user.roles || []).includes(role)) { toast("المستخدم لديه هذه الصلاحية"); return; }
+    const userRoles = user.roles || [];
+
+    if (userRoles.includes(ROLES.SUPER_ADMIN)) {
+      toast.error("لا يمكن تعديل صلاحيات السوبر أدمن");
+      return;
+    }
+
+    if (!isCurrentUserSuperAdmin && hasAnyRole(userRoles, [ROLES.ADMIN, ROLES.SUPER_ADMIN])) {
+      toast.error("ليس لديك صلاحية تعديل هذا المستخدم");
+      return;
+    }
+
+    if (!isCurrentUserSuperAdmin && role === ROLES.ADMIN) {
+      toast.error("فقط السوبر أدمن يمكنه منح صلاحية أدمن");
+      return;
+    }
+
+    if (userRoles.includes(role) && !(isCurrentUserSuperAdmin && userRoles.includes(ROLES.ADMIN) && role !== ROLES.ADMIN)) {
+      toast("المستخدم لديه هذه الصلاحية");
+      return;
+    }
     try {
       setLoadingActionKey(`role-${id}`);
       const updated = await updateAdminUserRole(id, role as Role);
+
+      if (!didRoleChangeApply(userRoles, updated.roles || [], role)) {
+        throw new Error("لم يتم تطبيق تغيير الصلاحية من الخادم");
+      }
+
       setUsers((prev) => prev.map((u) => getUserId(u) === id ? { ...u, ...updated } : u));
       toast.success("تم تحديث الصلاحيات");
     } catch (err: unknown) {
@@ -250,6 +320,11 @@ export default function UsersPage() {
     }
   };
 
+  const handleRemoveAdminRole = (user: User) => {
+    const nextRole = getRoleAfterAdminRemoval(user.roles || []);
+    setConfirmModal({ type: "role", user, role: nextRole });
+  };
+
   const onConfirm = async () => {
     if (!confirmModal) return;
     if (confirmModal.type === "delete") await handleSoftDelete(confirmModal.user);
@@ -258,11 +333,12 @@ export default function UsersPage() {
   };
 
   const rangeLabel = useMemo(() => {
-    if (pagination.totalItems === 0) return "لا يوجد مستخدمون";
+    if (visibleUsers.length === 0) return "لا يوجد مستخدمون";
     const start = (pagination.currentPage - 1) * pagination.limit + 1;
-    const end   = Math.min(start + users.length - 1, pagination.totalItems);
-    return `عرض ${start}–${end} من ${pagination.totalItems} مستخدم`;
-  }, [pagination, users.length]);
+    const total = isCurrentUserSuperAdmin ? pagination.totalItems : visibleUsers.length;
+    const end   = Math.min(start + visibleUsers.length - 1, total);
+    return `عرض ${start}–${end} من ${total} مستخدم`;
+  }, [pagination, visibleUsers.length, isCurrentUserSuperAdmin]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -296,7 +372,7 @@ export default function UsersPage() {
           <div className="relative">
             <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all placeholder:text-slate-400"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pr-9 pl-3 text-sm font-medium text-black outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all placeholder:text-slate-500"
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="بحث بالاسم أو الإيميل..."
               value={searchTerm}
@@ -305,19 +381,19 @@ export default function UsersPage() {
 
           {/* Role */}
           <select
-            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-700"
+            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-900 font-medium"
             onChange={(e) => setRoleFilter(e.target.value as "all" | ManageableRole)}
             value={roleFilter}
           >
             <option value="all">كل الصلاحيات</option>
-            <option value={ROLES.ADMIN}>أدمن</option>
+            {isCurrentUserSuperAdmin && <option value={ROLES.ADMIN}>أدمن</option>}
             <option value={ROLES.SELLER}>بائع</option>
             <option value={ROLES.CUSTOMER}>مشتري</option>
           </select>
 
           {/* Status */}
           <select
-            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-700"
+            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-900 font-medium"
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             value={statusFilter}
           >
@@ -328,7 +404,7 @@ export default function UsersPage() {
 
           {/* Email verification */}
           <select
-            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-700"
+            className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-all text-slate-900 font-medium"
             onChange={(e) => setVerificationFilter(e.target.value as VerificationFilter)}
             value={verificationFilter}
           >
@@ -367,7 +443,7 @@ export default function UsersPage() {
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto scrollbar-orange">
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase tracking-wider">
@@ -382,7 +458,12 @@ export default function UsersPage() {
                 {visibleUsers.map((user) => {
                   const id              = getUserId(user);
                   const roles           = getUserRoles(user.roles || []);
-                  const isProtected     = (user.roles || []).includes(ROLES.SUPER_ADMIN);
+                  const userRoles       = user.roles || [];
+                  const canDemoteAdmin  = isCurrentUserSuperAdmin
+                    && userRoles.includes(ROLES.ADMIN)
+                    && !userRoles.includes(ROLES.SUPER_ADMIN);
+                  const isProtected     = userRoles.includes(ROLES.SUPER_ADMIN)
+                    || (!isCurrentUserSuperAdmin && hasAnyRole(userRoles, [ROLES.ADMIN, ROLES.SUPER_ADMIN]));
                   const isStatusLoading = loadingActionKey === `status-${id}`;
                   const isRoleLoading   = loadingActionKey === `role-${id}`;
                   const isDeleteLoading = loadingActionKey === `delete-${id}`;
@@ -424,25 +505,39 @@ export default function UsersPage() {
                               {getRoleLabel(role)}
                             </span>
                           ))}
-                          {!isProtected && (
-                            <select
-                              className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:ring-1 focus:ring-orange-300 cursor-pointer disabled:opacity-40"
-                              disabled={isRoleLoading}
-                              onChange={(e) => {
-                                const r = e.target.value as ManageableRole;
-                                if (!r) return;
-                                isSensitiveRoleChange(user, r)
-                                  ? setConfirmModal({ type: "role", user, role: r })
-                                  : void performUpdateRole(user, r);
-                                e.target.value = "";
-                              }}
-                              value=""
-                            >
-                              <option value="">+ إضافة</option>
-                              {MANAGEABLE_ROLES.map((r) => (
-                                <option key={r} value={r}>{getRoleLabel(r)}</option>
-                              ))}
-                            </select>
+                          {!isProtected && manageableRoles.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 outline-none focus:ring-1 focus:ring-orange-300 cursor-pointer disabled:opacity-40"
+                                disabled={isRoleLoading}
+                                onChange={(e) => {
+                                  const r = e.target.value as ManageableRole;
+                                  if (!r) return;
+                                  if (isSensitiveRoleChange(user, r)) {
+                                    setConfirmModal({ type: "role", user, role: r });
+                                  } else {
+                                    void performUpdateRole(user, r);
+                                  }
+                                  e.target.value = "";
+                                }}
+                                value=""
+                              >
+                                <option value="">+ إضافة</option>
+                                {manageableRoles.map((r) => (
+                                  <option key={r} value={r}>{getRoleLabel(r)}</option>
+                                ))}
+                              </select>
+
+                              {canDemoteAdmin && (
+                                <button
+                                  onClick={() => handleRemoveAdminRole(user)}
+                                  className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+                                  type="button"
+                                >
+                                  إزالة أدمن
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -494,11 +589,16 @@ export default function UsersPage() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="md:hidden divide-y divide-slate-100">
+          <div className="md:hidden divide-y divide-slate-100 max-h-[60vh] overflow-y-auto scrollbar-orange">
             {visibleUsers.map((user) => {
               const id          = getUserId(user);
               const roles       = getUserRoles(user.roles || []);
-              const isProtected = (user.roles || []).includes(ROLES.SUPER_ADMIN);
+              const userRoles   = user.roles || [];
+              const canDemoteAdmin = isCurrentUserSuperAdmin
+                && userRoles.includes(ROLES.ADMIN)
+                && !userRoles.includes(ROLES.SUPER_ADMIN);
+              const isProtected = userRoles.includes(ROLES.SUPER_ADMIN)
+                || (!isCurrentUserSuperAdmin && hasAnyRole(userRoles, [ROLES.ADMIN, ROLES.SUPER_ADMIN]));
 
               return (
                 <div key={id} className="p-4 space-y-3">
@@ -542,6 +642,15 @@ export default function UsersPage() {
                   {/* Actions */}
                   {!isProtected && (
                     <div className="flex items-center gap-2 pt-1">
+                      {canDemoteAdmin && (
+                        <button
+                          onClick={() => handleRemoveAdminRole(user)}
+                          className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-700"
+                          type="button"
+                        >
+                          إزالة أدمن
+                        </button>
+                      )}
                       <button
                         onClick={() => void handleToggleStatus(user)}
                         className={[
