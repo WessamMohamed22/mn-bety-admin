@@ -79,15 +79,15 @@ export default function DashboardPage() {
       {/* --- 1. KPI COMPACT GRID --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Members", val: stats?.totalUsers, icon: <Users />, color: "text-blue-600", bg: "bg-blue-50" },
-          { label: "Verified", val: stats?.verifiedUsers, icon: <ShieldCheck />, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Monthly", val: stats?.newThisMonth, icon: <UserPlus />, color: "text-orange-600", bg: "bg-orange-50" },
-          { label: "Halted", val: stats?.deletedUsers, icon: <UserMinus />, color: "text-rose-600", bg: "bg-rose-50" },
+          { label: "Members", val: stats?.totalUsers, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Verified", val: stats?.verifiedUsers, icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Monthly", val: stats?.newThisMonth, icon: UserPlus, color: "text-orange-600", bg: "bg-orange-50" },
+          { label: "Halted", val: stats?.deletedUsers, icon: UserMinus, color: "text-rose-600", bg: "bg-rose-50" },
         ].map((item, i) => (
           <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm group relative">
             <div className="flex items-center gap-3">
               <div className={`w-9 h-9 ${item.bg} ${item.color} rounded-lg flex items-center justify-center shrink-0`}>
-                {React.cloneElement(item.icon as React.ReactElement, { size: 18 })}
+                <item.icon size={18} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight leading-none mb-1">{item.label}</p>
