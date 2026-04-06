@@ -6,8 +6,8 @@ import * as AdminService from "@/services/admin.service";
 import { AdminStats } from "@/types/admin";
 import {
   Users, ShieldCheck, UserMinus, UserPlus,
-  BarChart3, Calendar as CalendarIcon, Clock as ClockIcon, Activity,
-  ArrowUpRight, LayoutDashboard, Zap, ChevronRight
+  BarChart3, Calendar as CalendarIcon, Clock as  Activity,
+ LayoutDashboard, Zap, ChevronRight
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -240,7 +240,17 @@ export default function DashboardPage() {
             <h2 className="font-black text-slate-500 uppercase text-[10px] tracking-widest">System Calendar</h2>
           </div>
           <div className="compact-calendar">
-            <Calendar onChange={setDate} value={date} className="border-none w-full" prev2Label={null} next2Label={null} />
+            <Calendar
+              onChange={(value) => {
+                if (value instanceof Date) {
+                  setDate(value);
+                }
+              }}
+              value={date}
+              className="border-none w-full"
+              prev2Label={null}
+              next2Label={null}
+            />
           </div>
         </div>
 
